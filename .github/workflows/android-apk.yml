@@ -1,4 +1,3 @@
-
 name: Build Android APK
 
 on:
@@ -12,9 +11,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -23,19 +21,30 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # GitHub-hosted ubuntu-24.04 already contains Android SDK Platform 35
+      # and Android Build-tools 35.0.0. Do not run setup-android here:
+      # downloading command-line tools / accepting licenses may fail before compilation.
+      - name: Verify preinstalled Android SDK 35
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar" || { echo "Android SDK platform 35 is missing"; exit 1; }
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt2" || { echo "Android build-tools 35.0.0 is missing"; exit 1; }
+          echo "Preinstalled Android SDK 35 and Build-tools 35.0.0 found."
 
-      - name: Install Android SDK 35
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Setup Gradle
+      - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Source tests
-        run: node tests/core.test.js && node tests/minute.test.js && node tests/quick-nav.test.js && node tests/engine-v33.test.js && node tests/ui-regression.test.js && node tests/wear-link.test.js
+        run: |
+          node tests/core.test.js
+          node tests/minute.test.js
+          node tests/quick-nav.test.js
+          node tests/engine-v33.test.js
+          node tests/ui-regression.test.js
+          node tests/wear-link.test.js
 
       - name: Build phone and Wear OS debug APKs
         run: gradle --no-daemon --stacktrace :app:assembleDebug :wear:assembleDebug
